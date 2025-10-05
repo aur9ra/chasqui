@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "target": "ES6",
+    "lib": ["ES6"],
+    "module": "node18",
+    "types": ["node"],            
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false               
+  },
+  "include": [
+    "build-md/build-md.ts",
+  ]
+}
+
