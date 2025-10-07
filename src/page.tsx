@@ -16,39 +16,12 @@ let ANCHOR_PAGE_CONTENT_CACHE = new Map<string, string>();
 // currently, the functions associated with the cache are quite primitive, just calling
 // various methods of the base ANCHOR_PAGE_CONTENT_CACHE as an abstraction.
 
+
 async function cacheHrefContent(href: string) {
   if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
     return;
   }
   ANCHOR_PAGE_CONTENT_CACHE.set(href, await queryHrefContent(href))
-}
-
-async function getHrefContent(href: string): Promise<string> {
-  if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
-    return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
-  } else {
-    console.log(`${href} is not present in ANCHOR_PAGE_CONTENT_CACHE. Caching. (Below is the cache:)`);
-    console.log(ANCHOR_PAGE_CONTENT_CACHE);
-    cacheHrefContent(href)
-    return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
-  }
-}
-
-/*
-functions to deal with the anchor tags in the page
-*/
-
-function isHTMLAnchorElement(a: any): a is HTMLAnchorElement {
-  return a instanceof HTMLAnchorElement;
-}
-
-function getAnchorElements(doc: Document): Array<HTMLAnchorElement> {
-  let arr = [];
-  for (let i = 0; i < doc.links.length; i++) {
-    arr.push(doc.links.item(i));
-  }
-
-  return arr.filter(ele => ele instanceof HTMLAnchorElement);
 }
 
 async function queryHrefContent(href: string): Promise<string> {
@@ -65,57 +38,85 @@ async function queryHrefContent(href: string): Promise<string> {
   }
 }
 
-async function queryAnchorContent(a: HTMLAnchorElement): Promise<string> {
-  return await queryHrefContent(a.href);
+async function getHrefContent(href: string): Promise<string> {
+  // determine if the user is requesting at root
+  if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
+    return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
+  } else {
+    cacheHrefContent(href)
+    return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
+  }
+}
+
+/*
+functions to deal with the anchor tags in the page
+*/
+
+function getAnchorElements(doc: Document): Array<HTMLAnchorElement> {
+  let arr = [];
+  for (let i = 0; i < doc.links.length; i++) {
+    arr.push(doc.links.item(i));
+  }
+
+  return arr.filter(ele => ele instanceof HTMLAnchorElement);
 }
 
 /*
 page, main functionality. the Driver
 */
 
+const getNormalHref = (href: string, pathname: string): string => {
+  if (pathname === "/") {
+    return href + "index.html";
+  } else {
+    return href;
+  }
+}
+
 export function Page() {
-  // when we click on the anchor, we want the following to happen:
-  // // 1. determine if the HTML content of the resource has been cached
-  // // 2. if so, we want to call a function with the cached page content.
-  // // this function will replace the body of the document, update the history, etc.
-  // // 3. return a status code (to be implemented later)
-  const onAnchorClick = async (e: Event) => {
+  const onAnchorClick = async (e: MouseEvent) => {
     e.preventDefault();
 
-    const a = e.target;
-    if (isHTMLAnchorElement(a)) {
-      handleHrefChangeState(a.href);
+    const a = e.target!;
+    if (a instanceof HTMLAnchorElement) {
+      const href = getNormalHref(a.href, a.pathname);
+      updatePageHref(href);
     }
-  }
-  const handleHrefChangeState = async (href: string) => {
-    setPageHref(href);
-  }
-
-  const handlePopStateEvent = async (e: PopStateEvent) => {
-    setPageHref(e.state.href, false);
   }
 
   // when we update the page, we need to tell preact that we are now rerendering the page.
-  // this is the main callback of the program for anchor clicks.
+  // this is the main callback of the program.
   const [pageContent, _setPageContent] = useState(document.getElementById("app")!.innerHTML);
 
-  const setPageHref = (href: string, push_state: boolean = true) => {
+  const updatePageHref = (href: string, push_state: boolean = true) => {
     getHrefContent(href).then(
       html => {
         _setPageContent(html);
         document.getElementById("app")!.innerHTML = html;
 
         if (push_state) {
-          history.pushState({ href }, "", href);
+          history.pushState({ href: href }, "", href);
         }
       }
     );
   }
 
+  // when loading the page, we need to add state to the history entry
+  // the browser generates
+  // 
+  // we also need to add the event listener for popstate, i.e. fwd/back
   useEffect(() => {
+    // set initial state 
+    {
+      const href = getNormalHref(window.location.href, window.location.pathname)
+      history.replaceState({ href: href }, "", href);
+    }
+
     window.addEventListener("popstate", async (e: PopStateEvent) => {
-      handlePopStateEvent(e);
-      history.replaceState({ href: window.location.href }, "", window.location.href);
+      const href = e.state.href;
+      e.preventDefault();
+      updatePageHref(href, false);
+      history.replaceState({ href: href }, "", href);
     })
   }, [])
 
@@ -134,4 +135,3 @@ export function Page() {
 
   return "No page text found.";
 };
-
