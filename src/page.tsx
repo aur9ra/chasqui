@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 
 /*
 functions to handle the state of the cache
@@ -16,13 +16,12 @@ let ANCHOR_PAGE_CONTENT_CACHE = new Map<string, string>();
 // currently, the functions associated with the cache are quite primitive, just calling
 // various methods of the base ANCHOR_PAGE_CONTENT_CACHE as an abstraction.
 
+
 async function cacheHrefContent(href: string) {
   if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
     return;
   }
-  let query = await queryHrefContent(href)
-
-  ANCHOR_PAGE_CONTENT_CACHE.set(href, query)
+  ANCHOR_PAGE_CONTENT_CACHE.set(href, await queryHrefContent(href))
 }
 
 async function queryHrefContent(href: string): Promise<string> {
@@ -45,8 +44,6 @@ async function getHrefContent(href: string): Promise<string> {
     return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
   } else {
     cacheHrefContent(href)
-    let hrefContent = ANCHOR_PAGE_CONTENT_CACHE.get(href);
-
     return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
   }
 }
@@ -77,46 +74,27 @@ const getNormalHref = (href: string, pathname: string): string => {
 }
 
 export function Page() {
-  // determine if the user is clicking a link
-
-  // when the user wants to nagivate
-  // (clicking fwd/back button in browser, clicking link)
-  // swap out the content for cached content
-  // and appropriately update the history
-  const handleNavigationEvent = (e: Event) => {
+  const onAnchorClick = async (e: MouseEvent) => {
     e.preventDefault();
 
-    if (e instanceof PopStateEvent) {
-      const href = e.state.href;
-      updatePageHref(href, false);
-      // updatePageHref uses pushState, we need replaceState
-
-      history.replaceState({ href: href }, "", href);
-    }
-
-    if (e instanceof PointerEvent) {
-      const a = e.target!;
-      if (a instanceof HTMLAnchorElement) {
-        const href = getNormalHref(a.href, a.pathname);
-        updatePageHref(href);
-      }
+    const a = e.target!;
+    if (a instanceof HTMLAnchorElement) {
+      const href = getNormalHref(a.href, a.pathname);
+      updatePageHref(href);
     }
   }
 
   // when we update the page, we need to tell preact that we are now rerendering the page.
   // this is the main callback of the program.
   const [pageContent, _setPageContent] = useState(document.getElementById("app")!.innerHTML);
-  const [initialLoad, _setInitialLoad] = useState(true);
 
-  // when the page's href is updated, we should update the content of the page.
-  const updatePageHref = (href: string, handle_state: boolean = true) => {
-    _setInitialLoad(false);
-
+  const updatePageHref = (href: string, push_state: boolean = true) => {
     getHrefContent(href).then(
       html => {
         _setPageContent(html);
+        document.getElementById("app")!.innerHTML = html;
 
-        if (handle_state) {
+        if (push_state) {
           history.pushState({ href: href }, "", href);
         }
       }
@@ -130,37 +108,30 @@ export function Page() {
   useEffect(() => {
     // set initial state 
     {
-      const href = getNormalHref(window.location.href, window.location.pathname) // get the href of current location
-      cacheHrefContent(href); // cache it (incase, say, user goes fwd -> back)
-      history.replaceState({ href: href }, "", href); //insert href state info
+      const href = getNormalHref(window.location.href, window.location.pathname)
+      history.replaceState({ href: href }, "", href);
     }
 
-    // when the user presses fwd/back
     window.addEventListener("popstate", async (e: PopStateEvent) => {
+      const href = e.state.href;
       e.preventDefault();
-      handleNavigationEvent(e);
+      updatePageHref(href, false);
+      history.replaceState({ href: href }, "", href);
     })
-
-    // because we are loading this, we need to erase what was previously here
-    // document.getElementById("app")!.innerHTML = "";
-  }, []) // at runtime
-
-  // when pageContent is available, before the browser renders
-  // set the content seamlessly (removing the server side render)
-  useLayoutEffect(() => {
-    document.getElementById("app")!.innerHTML = pageContent;
-  })
+  }, [])
 
   // iterate over links (anchor elements) in the current document and cache the html main tag in plaintext
   useEffect(() => {
     getAnchorElements(document).map((a: HTMLAnchorElement) => {
       cacheHrefContent(a.href);
-      a.addEventListener("click", handleNavigationEvent) // when this link is clicked, run the corresponding
-      // function to handle the navigation event
+      a.addEventListener("click", onAnchorClick)
     })
+  }, [pageContent]);
 
+  if (document.getElementById("app")?.innerText.length != 0) {
+    // the text of the page is already loaded
+    return;
+  }
 
-  }, [pageContent]); // when the content of the page changes
-
-  return <div id="loaded_app">pageContent</div>;
+  return "No page text found.";
 };
