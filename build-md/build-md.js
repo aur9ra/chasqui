@@ -32,9 +32,11 @@ function buildMdFromString(buffer) {
 }
 function buildMdFromDir(dir) {
     return __awaiter(this, void 0, void 0, function* () {
+        // vite has built our page into "index.html"
+        // now, we will scan over the directory and inject some base html
+        // into copies of "index.html"
         var _a, dir_1, dir_1_1;
         var _b, e_1, _c, _d;
-        // Determine where to stick the md in our app shell
         const app_html = yield readFile(APP_PATH, { encoding: "utf8" });
         const app_tag_indices = {
             start: app_html.indexOf(MAIN_TAG.start) + MAIN_TAG.start.length,
@@ -49,6 +51,10 @@ function buildMdFromDir(dir) {
             end: app_html.slice(app_tag_index),
         };
         try {
+            // app_shell now is an object of {
+            //    start: stuff that goes before compiled markdown
+            //    end: stuff that goes after compiled markdown
+            // }
             for (_a = true, dir_1 = __asyncValues(dir); dir_1_1 = yield dir_1.next(), _b = dir_1_1.done, !_b; _a = true) {
                 _d = dir_1_1.value;
                 _a = false;
@@ -57,10 +63,17 @@ function buildMdFromDir(dir) {
                     continue;
                 }
                 const page_file_name = dirent.name.replace(".md", "");
-                const input_path = path.posix.join(dirent.parentPath, page_file_name + ".md");
-                const output_html_path = path.posix.join(CONTENT_OUTPUT_PATH, page_file_name + ".html");
-                const output_main_html_path = path.posix.join(CONTENT_OUTPUT_PATH, page_file_name + ".main.html");
-                const md = yield readFile(input_path, { encoding: "utf8" }).then((result) => buildMdFromString(result)).then((result) => { return result; });
+                const md_path = path.posix.join(dirent.parentPath, page_file_name + ".md");
+                console.log(`md_path: ${md_path}`);
+                const relative_dir = path.posix.relative(dir.path, dirent.parentPath);
+                console.log(`relative_dir: ${relative_dir}`);
+                const output_dir = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir);
+                const output_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".html");
+                const output_main_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".main.html");
+                console.log(`output_dir: ${output_dir}`);
+                const md = yield readFile(md_path, { encoding: "utf8" }).then((result) => buildMdFromString(result)).then((result) => { return result; });
+                // confirm that pages in folders have corresponding folders in output path
+                fs.mkdir(output_dir, { recursive: true });
                 const app_wrapped_md = app_shell.start + md + app_shell.end;
                 // for each markdown file, we will write the following:
                 // file.html, which contains the app specified and will be served "defaultly"
@@ -78,4 +91,7 @@ function buildMdFromDir(dir) {
         }
     });
 }
+// todo: determine if dist has "dead folders", i.e. folders that don't correspond to any
+// currently existing paths
+// edge case though :)
 opendir(CONTENT_BASE_PATH, { recursive: true }).then((result) => buildMdFromDir(result));
