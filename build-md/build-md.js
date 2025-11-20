@@ -63,18 +63,17 @@ function buildMdFromDir(dir) {
                     continue;
                 }
                 const page_file_name = dirent.name.replace(".md", "");
-                const md_path = path.posix.join(dirent.parentPath, page_file_name + ".md");
-                console.log(`md_path: ${md_path}`);
+                const input_md_path = path.posix.join(dirent.parentPath, page_file_name + ".md");
                 const relative_dir = path.posix.relative(dir.path, dirent.parentPath);
-                console.log(`relative_dir: ${relative_dir}`);
                 const output_dir = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir);
-                const output_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".html");
-                const output_main_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".main.html");
-                console.log(`output_dir: ${output_dir}`);
-                const md = yield readFile(md_path, { encoding: "utf8" }).then((result) => buildMdFromString(result)).then((result) => { return result; });
+                const output_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".html"); // dist/index.html
+                const output_main_html_path = path.posix.join(CONTENT_OUTPUT_PATH, relative_dir, page_file_name + ".main.html"); // dist/index.main.html
+                const md = yield readFile(input_md_path, { encoding: "utf8" }).then((result) => buildMdFromString(result)).then((result) => { return result; });
                 // confirm that pages in folders have corresponding folders in output path
                 fs.mkdir(output_dir, { recursive: true });
                 const app_wrapped_md = app_shell.start + md + app_shell.end;
+                console.log(`Writing file to: ${output_html_path}`); // for some reason, this makes it work??
+                // todo: look into this???
                 // for each markdown file, we will write the following:
                 // file.html, which contains the app specified and will be served "defaultly"
                 // file.main.html, which contains purely the md (what can be loaded into the page by the app)

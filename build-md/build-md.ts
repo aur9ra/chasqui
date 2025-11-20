@@ -71,6 +71,9 @@ async function buildMdFromDir(dir: Dir): Promise<void> {
 
     const app_wrapped_md = app_shell.start + md + app_shell.end;
 
+    console.log(`Writing file to: ${output_html_path}`); // for some reason, this makes it work??
+    // todo: look into this???
+
     // for each markdown file, we will write the following:
     // file.html, which contains the app specified and will be served "defaultly"
     // file.main.html, which contains purely the md (what can be loaded into the page by the app)

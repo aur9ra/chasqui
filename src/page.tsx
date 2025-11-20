@@ -17,13 +17,24 @@ let ANCHOR_PAGE_CONTENT_CACHE = new Map<string, string>();
 // various methods of the base ANCHOR_PAGE_CONTENT_CACHE as an abstraction.
 
 
-async function cacheHrefContent(href: string) {
+async function cacheHrefContent(href: string): Promise<boolean> {
   if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
-    return;
+    return Promise.resolve(true);
   }
-  ANCHOR_PAGE_CONTENT_CACHE.set(href, await queryHrefContent(href))
+
+  // query the server for content
+  // if it finds content, great, cache it
+  // else, send the error up the stack
+  return queryHrefContent(href).then(
+    result => {
+      ANCHOR_PAGE_CONTENT_CACHE.set(href, result);
+      return Promise.resolve(true)
+    },
+    error => { return Promise.reject(error) }
+  );
 }
 
+// query the server for an href
 async function queryHrefContent(href: string): Promise<string> {
   const uri = href.replace(".html", ".main.html");
 
@@ -38,7 +49,7 @@ async function queryHrefContent(href: string): Promise<string> {
   }
 }
 
-async function getHrefContent(href: string): Promise<string> {
+async function getHrefContent(href: string): Promise<string | null> {
   // determine if the user is requesting at root
   if (ANCHOR_PAGE_CONTENT_CACHE.has(href)) {
     return ANCHOR_PAGE_CONTENT_CACHE.get(href) as string;
@@ -133,5 +144,6 @@ export function Page() {
     return;
   }
 
+  console.log(ANCHOR_PAGE_CONTENT_CACHE);
   return "No page text found.";
 };
